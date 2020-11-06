@@ -35,7 +35,7 @@ def verPlan():
 
     file.write(json.dumps(result[0]))
     file.close()
-    os.system("python3 json_viewer.py explain.json")
+    os.system("python json_viewer.py explain.json")
 
 B = tk.Button(root, text ="Ver plan", command = verPlan)
 B.pack()
