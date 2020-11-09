@@ -1,14 +1,17 @@
 from tkinter import *
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
+from tkinter.ttk import Combobox
 import os
 import psycopg2
 import json
 
+# Cambiar de ventana.
 def toBack (currentWindow, nextWindow):
         currentWindow.destroy()
         nextWindow.deiconify()
 
+# Crear conección.
 def createConnection(user, password, server, port, db):
     try:
         # Está quemado, cambiarlo por los parametros
@@ -22,22 +25,59 @@ def createConnection(user, password, server, port, db):
         print ("Error conectando a PostgreSQL", error)
         return None
 
+# Validar connección.
 def validateConnection(root, user, password, server, port, db):
     connection = createConnection(user, password, server, port, db)
     if (connection != None):
         secondWindow(root, connection)
-        
-def showPlain(conn, text):
+
+# Mostrar plan de ejecución.
+def showPlain(conn, text, context):
     cursor = conn.cursor()       
     consulta = text
-    cursor.execute("""explain (format JSON, verbose true)                             
-                            """+consulta)
+    cursor.execute("explain (format JSON, " + context + ")" + consulta)
     result = cursor.fetchone()
     file = open(r"explain.json","wt")
     file.write(json.dumps(result[0]))
     file.close()
     os.system("python json_viewer.py explain.json")
 
+# Ventana de privilegios
+def privilegeWindow(root, connection):
+    root.withdraw()
+    window = Tk()
+    window.config (background="gray")
+    window.title("Privilegios")
+    window.geometry ("1200x800")
+
+    Label (window, text="Tablas", font="Arial, 12").pack()
+    cmbTables = Combobox(window).pack()
+    cursor = connection.cursor()
+    cursor.execute("""SELECT table_name
+        FROM information_schema.tables
+        WHERE table_type = 'BASE TABLE'
+        AND table_schema NOT IN ('pg_catalog', 'information_schema');""") # Get tables
+    result = cursor.fetchone()
+    print(result)
+
+    #cmbTables['values'] = result
+    #cmbTables.current(0) #set the selected item
+    #x = cmbTables.get()
+    #print("x", x)
+
+    Label (window, text="Atributos", font="Arial, 12").pack()
+    cmbAttributes = Combobox(window).pack()
+    # cursor.execute() # Get tables
+    """cmbAttributes['values']= (1, 2, 3, 4, 5)
+    cmbAttributes.current(0) #set the selected item
+    cmbAttributes.get()"""
+
+    btn_destroy = Button(window, text="Atrás", font="Arial, 12", command = lambda:toBack(window, root))
+    btn_destroy.pack()
+
+    root.wait_window(window)
+
+# Ventana de planes de ejecición
 def secondWindow(root, connection):
     root.withdraw()
     window = Tk()
@@ -46,7 +86,7 @@ def secondWindow(root, connection):
     window.geometry ("1200x800")
 
     T = ScrolledText(window, height=10, width=100)
-    T.pack()
+    T.pack(pady=10)
     T.insert(tk.END, """--Inserte aquí su código SQL para mostrar el plan de ejecución
     --código de ejemplo:
     select * from 
@@ -56,17 +96,27 @@ def secondWindow(root, connection):
         on st_contains(c.geom,p.geom5367)
                     """)
     
-    btn_plain = Button(window, text="Ver plan", command = lambda:showPlain(connection, T.get("1.0","end")))
-    btn_plain.pack()
+    btn_plainTrue = Button(window, text="Ver el plan de ejecución estimado detallado", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "verbose true"))
+    btn_plainTrue.pack()
 
-    btn_privilege = Button(window, text="Ver privilegio" """, command = lambda:showPlain(connection, T.get("1.0","end"))""")
+    btn_plainFalse = Button(window, text="Ver el plan de ejecución estimado simple", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "verbose false"))
+    btn_plainFalse.pack(pady=10)
+
+    btn_plainRealTrue = Button(window, text="Ver el plan de ejecución real detallado", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "analize true"))
+    btn_plainRealTrue.pack()
+
+    btn_plainRealFalse = Button(window, text="Ver el plan de ejecución real simple", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "analize false"))
+    btn_plainRealFalse.pack(pady=10)
+
+    btn_privilege = Button(window, text="Ver privilegios", font="Arial, 12", command = lambda:privilegeWindow(window,connection))
     btn_privilege.pack()
 
-    btn_destroy = Button(window, text="Cerrar sesión", command = lambda:toBack(window, root))
-    btn_destroy.pack()
+    btn_destroy = Button(window, text="Cerrar sesión", font="Arial, 12", command = lambda:toBack(window, root))
+    btn_destroy.pack(pady=10)
 
     root.wait_window(window)
 
+# Ventana principal: Inicio de sesión.
 def main():
     root = Tk()
     root.config (background="gray")

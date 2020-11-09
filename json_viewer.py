@@ -85,6 +85,10 @@ class JsonView(QtWidgets.QWidget):
 
     def make_find_ui(self):
 
+        # size
+        self.setFixedWidth(800)
+        self.setFixedHeight(500)
+
         # Text box
         self.find_box = QtWidgets.QLineEdit()
         self.find_box.returnPressed.connect(self.find_button_clicked)
