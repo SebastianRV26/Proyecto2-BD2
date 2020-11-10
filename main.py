@@ -6,6 +6,9 @@ import os
 import psycopg2
 import json
 
+# global variables
+user = ""
+
 # Cambiar de ventana.
 def toBack (currentWindow, nextWindow):
         currentWindow.destroy()
@@ -13,6 +16,8 @@ def toBack (currentWindow, nextWindow):
 
 # Crear conección.
 def createConnection(user, password, server, port, db):
+    # user = user
+    user = "basesII" # delete later
     try:
         # Está quemado, cambiarlo por los parametros
         conn = psycopg2.connect(user = "basesII",
@@ -51,26 +56,42 @@ def privilegeWindow(root, connection):
     window.geometry ("1200x800")
 
     Label (window, text="Tablas", font="Arial, 12").pack()
-    cmbTables = Combobox(window).pack()
+    cmbTables = Combobox(window, font="Arial, 12")
+    cmbTables.pack()
     cursor = connection.cursor()
     cursor.execute("""SELECT table_name
         FROM information_schema.tables
         WHERE table_type = 'BASE TABLE'
         AND table_schema NOT IN ('pg_catalog', 'information_schema');""") # Get tables
-    result = cursor.fetchone()
-    print(result)
+    result = cursor.fetchall() 
+    #print(result)
 
-    #cmbTables['values'] = result
-    #cmbTables.current(0) #set the selected item
-    #x = cmbTables.get()
-    #print("x", x)
+    # cmbTables["values"] = []
+    columns = []
+    for i in result:
+        columns.append(i[0])
+
+    cmbTables["values"] = tuple(columns)
+    cmbTables.current(0) #set the first item
 
     Label (window, text="Atributos", font="Arial, 12").pack()
-    cmbAttributes = Combobox(window).pack()
-    # cursor.execute() # Get tables
-    """cmbAttributes['values']= (1, 2, 3, 4, 5)
-    cmbAttributes.current(0) #set the selected item
-    cmbAttributes.get()"""
+    cmbAttributes = Combobox(window, font="Arial, 12")
+    cmbAttributes.pack()
+    
+    def callback(eventObject):
+        x = cmbTables.get()
+        table = x
+        cursor.execute("""SELECT column_name
+        FROM information_schema.columns
+        WHERE "table_name"='"""+table+"""'""") # Get tables
+        result = cursor.fetchall() 
+        columns = []
+        for i in result:
+            columns.append(i[0])
+        cmbAttributes["values"] = tuple(columns)
+        cmbAttributes.current(0)
+
+    cmbTables.bind("<<ComboboxSelected>>", callback) # on item clicked
 
     btn_destroy = Button(window, text="Atrás", font="Arial, 12", command = lambda:toBack(window, root))
     btn_destroy.pack()
