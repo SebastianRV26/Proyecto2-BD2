@@ -59,10 +59,11 @@ def privilegeWindow(root, connection):
     cmbTables = Combobox(window, font="Arial, 12")
     cmbTables.pack()
     cursor = connection.cursor()
-    cursor.execute("""SELECT table_name
+    # Get scheme.tables
+    cursor.execute("""SELECT table_schema || '.' || table_name AS table_name
         FROM information_schema.tables
         WHERE table_type = 'BASE TABLE'
-        AND table_schema NOT IN ('pg_catalog', 'information_schema');""") # Get tables
+            AND table_schema NOT IN ('pg_catalog', 'information_schema');""")
     result = cursor.fetchall() 
     #print(result)
 
@@ -72,7 +73,6 @@ def privilegeWindow(root, connection):
         columns.append(i[0])
 
     cmbTables["values"] = tuple(columns)
-    cmbTables.current(0) #set the first item
 
     Label (window, text="Atributos", font="Arial, 12").pack()
     cmbAttributes = Combobox(window, font="Arial, 12")
@@ -80,10 +80,13 @@ def privilegeWindow(root, connection):
     
     def callback(eventObject):
         x = cmbTables.get()
-        table = x
+        item = x
+        items = item.split('.')
+        # Get Attributes
         cursor.execute("""SELECT column_name
         FROM information_schema.columns
-        WHERE "table_name"='"""+table+"""'""") # Get tables
+        WHERE "table_name"='""" + items[1] + """' 
+        AND table_schema='""" + items[0] + """'""")
         result = cursor.fetchall() 
         columns = []
         for i in result:
@@ -123,10 +126,10 @@ def secondWindow(root, connection):
     btn_plainFalse = Button(window, text="Ver el plan de ejecución estimado simple", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "verbose false"))
     btn_plainFalse.pack(pady=10)
 
-    btn_plainRealTrue = Button(window, text="Ver el plan de ejecución real detallado", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "analize true"))
+    btn_plainRealTrue = Button(window, text="Ver el plan de ejecución real detallado", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "analyze false"))
     btn_plainRealTrue.pack()
 
-    btn_plainRealFalse = Button(window, text="Ver el plan de ejecución real simple", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "analize false"))
+    btn_plainRealFalse = Button(window, text="Ver el plan de ejecución real simple", font="Arial, 12", command = lambda:showPlain(connection, T.get("1.0","end"), "analyze true"))
     btn_plainRealFalse.pack(pady=10)
 
     btn_privilege = Button(window, text="Ver privilegios", font="Arial, 12", command = lambda:privilegeWindow(window,connection))
