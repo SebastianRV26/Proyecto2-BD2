@@ -33,28 +33,80 @@ class Main(QtWidgets.QMainWindow):
 
         # Estimado detallado
         if self.ui.cbPlan.currentIndex() == 0:
-            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "verbose true")
+            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "verbose true", False)
         # Estimado simple
         elif self.ui.cbPlan.currentIndex() == 1:
-            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "verbose false")
+            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "verbose false", False)
         # Real detallado
         elif self.ui.cbPlan.currentIndex() == 2:
-            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "analyze true")
+            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "verbose true", True)
         # Real simple
         elif self.ui.cbPlan.currentIndex() == 3:
-            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "analyze false")
+            self.showPlan(Database.connection, self.ui.txtCode.toPlainText(), "verbose false", True)
 
-    def showPlan(self, conn, text, context):
+    def showPlan(self, conn, text, context, realPlan):
         """
         This method shows execution plan.
         """
         cursor = conn.cursor()
-        cursor.execute("explain (format JSON, " + context + ")" + text)
+        if realPlan:
+            cursor.execute("explain (format JSON, analyze true, " + context + ")" + text)
+        else:
+            cursor.execute("explain (format JSON, " + context + ")" + text)
         result = cursor.fetchone()
+
+        if "false" in context:
+            cursor = conn.cursor()
+            cursor.execute("explain (format JSON, " + context.replace("false", "true") + ")" + text)
+            tmpResult = cursor.fetchone()
+            result[0][0]["Plan"]["Indexes usage"] = \
+                self.getIndexesUsage(tmpResult[0][0]["Plan"]["Plans"][0]["Plans"])
+        else:
+            result[0][0]["Plan"]["Indexes usage"] = \
+                self.getIndexesUsage(result[0][0]["Plan"]["Plans"][0]["Plans"])
+
         file = open(r"explain.json", "wt")
         file.write(json.dumps(result[0]))
         file.close()
         os.system("python json_viewer.py explain.json")
+
+    def getIndexesUsage(self, data):
+        tables = []
+        indexes = []
+
+        for plan in data:
+            if "Schema" in plan and "Relation Name" in plan:
+                tables.append((plan["Schema"], plan["Relation Name"]))
+            if "Index Name" in plan:
+                indexes.append(plan["Index Name"])
+
+        indexesUsage = {}
+        for tableIndexes in self.getTablesIndexes(tables):
+            temp = {}
+            for idx in tableIndexes[1].split(','):
+                temp[idx] = "Used" if idx in indexes else "Not used"
+            indexesUsage[tableIndexes[0]] = temp
+
+        return indexesUsage
+
+    def getTablesIndexes(self, tables):
+        where = ""
+
+        for table in tables:
+            where += """(schemaname = '""" + table[0] + """' AND tablename = '""" + table[1] + """') OR """
+
+        where = where[:-3]
+
+        cursor = Database.connection.cursor()
+        cursor.execute("""SELECT schemaname || '.' || tablename AS table,
+                                string_agg(indexname, ',' order by indexname) as indexes
+                            FROM pg_indexes
+                            WHERE """ + where + """
+                            GROUP BY tablename, schemaname
+                            ORDER BY tablename;""")
+        result = cursor.fetchall()
+
+        return result
 
     def signoff(self):
         if self.loginWindow is not None:
