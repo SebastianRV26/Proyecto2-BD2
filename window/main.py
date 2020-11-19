@@ -2,14 +2,20 @@ import json
 import os
 import sys
 
+import psycopg2
 from PyQt5 import QtWidgets
 
 from database import Database
 from ui.main import Ui_MainWindow
+from utils import *
 from window.privileges import Privileges
 
 
 class Main(QtWidgets.QMainWindow):
+    """"
+    Main window class.
+    """
+
     def __init__(self, loginWindow=None, *args, **kwargs):
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
 
@@ -48,27 +54,30 @@ class Main(QtWidgets.QMainWindow):
         """
         This method shows execution plan.
         """
-        cursor = conn.cursor()
-        if realPlan:
-            cursor.execute("explain (format JSON, analyze true, " + context + ")" + text)
-        else:
-            cursor.execute("explain (format JSON, " + context + ")" + text)
-        result = cursor.fetchone()
-
-        if "false" in context:
+        try:
             cursor = conn.cursor()
-            cursor.execute("explain (format JSON, " + context.replace("false", "true") + ")" + text)
-            tmpResult = cursor.fetchone()
-            result[0][0]["Plan"]["Indexes usage"] = \
-                self.getIndexesUsage(tmpResult[0][0]["Plan"]["Plans"][0]["Plans"])
-        else:
-            result[0][0]["Plan"]["Indexes usage"] = \
-                self.getIndexesUsage(result[0][0]["Plan"]["Plans"][0]["Plans"])
+            if realPlan:
+                cursor.execute("explain (format JSON, analyze true, " + context + ")" + text)
+            else:
+                cursor.execute("explain (format JSON, " + context + ")" + text)
+            result = cursor.fetchone()
 
-        file = open(r"explain.json", "wt")
-        file.write(json.dumps(result[0]))
-        file.close()
-        os.system("python json_viewer.py explain.json")
+            if "false" in context:
+                cursor = conn.cursor()
+                cursor.execute("explain (format JSON, " + context.replace("false", "true") + ")" + text)
+                tmpResult = cursor.fetchone()
+                result[0][0]["Plan"]["Indexes usage"] = \
+                    self.getIndexesUsage(tmpResult[0][0]["Plan"]["Plans"][0]["Plans"])
+            else:
+                result[0][0]["Plan"]["Indexes usage"] = \
+                    self.getIndexesUsage(result[0][0]["Plan"]["Plans"][0]["Plans"])
+
+            file = open(r"explain.json", "wt")
+            file.write(json.dumps(result[0]))
+            file.close()
+            os.system("python json_viewer.py explain.json")
+        except (Exception, psycopg2.Error) as error:
+            showError(self, "Error al obtener y guardar el plan de ejecución")
 
     def getIndexesUsage(self, data):
         tables = []
@@ -97,16 +106,19 @@ class Main(QtWidgets.QMainWindow):
 
         where = where[:-3]
 
-        cursor = Database.connection.cursor()
-        cursor.execute("""SELECT schemaname || '.' || tablename AS table,
-                                string_agg(indexname, ',' order by indexname) as indexes
-                            FROM pg_indexes
-                            WHERE """ + where + """
-                            GROUP BY tablename, schemaname
-                            ORDER BY tablename;""")
-        result = cursor.fetchall()
-
-        return result
+        try:
+            cursor = Database.connection.cursor()
+            cursor.execute("""SELECT schemaname || '.' || tablename AS table,
+                                    string_agg(indexname, ',' order by indexname) as indexes
+                                FROM pg_indexes
+                                WHERE """ + where + """
+                                GROUP BY tablename, schemaname
+                                ORDER BY tablename;""")
+            result = cursor.fetchall()
+            return result
+        except (Exception, psycopg2.Error) as error:
+            showError(self, "Error al obtener la información de indices")
+            return None
 
     def signoff(self):
         if self.loginWindow is not None:

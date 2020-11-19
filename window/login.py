@@ -7,6 +7,10 @@ from window.main import Main
 
 
 class Login(QtWidgets.QMainWindow):
+    """"
+    Class for the login window.
+    """
+
     def __init__(self, *args, **kwargs):
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
         self.mainWindow = None
