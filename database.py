@@ -14,14 +14,13 @@ class Database:
         """"
         Creates the connection with the database using the specified credentials.
         """
-        Database.globalUser = "basesII"  # delete later
+        Database.globalUser = user
         try:
-            # TODO: Está quemado, cambiarlo por los parametros
-            Database.connection = psycopg2.connect(user="basesII",
-                                                   password="12345",
-                                                   host="leoviquez.com",
-                                                   port="5432",
-                                                   database="basesII")
+            Database.connection = psycopg2.connect(user=user,
+                                                   password=password,
+                                                   host=server,
+                                                   port=port,
+                                                   database=db)
             return Database.connection
         except (Exception, psycopg2.Error) as error:
             print("Error conectando a PostgreSQL", error)
